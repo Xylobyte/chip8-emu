@@ -1,7 +1,9 @@
 use crate::chip8::Chip8;
 use crate::scheduler::Scheduler;
 use crate::{ROM_FILENAME, SCREEN_HEIGHT, SCREEN_SCALE, SCREEN_WIDTH};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
+use std::time::Duration;
 
 pub struct Emulator {
     window: Window,
@@ -28,6 +30,29 @@ impl Emulator {
 
         let mut scheduler = Scheduler::new();
 
+        let host = cpal::default_host();
+        let device = host.default_output_device().expect("no output device");
+        let config = device.default_output_config().unwrap();
+
+        let sample_rate = config.sample_rate().0 as f32;
+        let freq = 330.0;
+        let mut sample_clock = 0f32;
+
+        let stream = device
+            .build_output_stream(
+                &config.into(),
+                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                    for sample in data.iter_mut() {
+                        let t = (sample_clock * freq / sample_rate) % 1.0;
+                        *sample = if t < 0.5 { 0.1 } else { -0.1 };
+                        sample_clock += 1.0;
+                    }
+                },
+                |err| eprintln!("an error occurred on stream: {}", err),
+                Some(Duration::from_hours(1)),
+            )
+            .unwrap();
+
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             self.detect_keyboard(&mut chip8);
 
@@ -35,6 +60,12 @@ impl Emulator {
                 |chip8, is_timer_step| {
                     if is_timer_step {
                         chip8.update_timers();
+
+                        if chip8.sound_timer > 0 {
+                            stream.play().unwrap();
+                        } else {
+                            stream.pause().unwrap();
+                        }
                     } else {
                         chip8.execute_cycle();
                     }

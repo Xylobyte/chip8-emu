@@ -4,7 +4,7 @@ mod scheduler;
 
 use crate::emu::Emulator;
 
-const CPU_HZ: f64 = 550.0;
+const CPU_HZ: f64 = 800.0;
 const TIMER_HZ: f64 = 60.0;
 
 const CPU_DT: f64 = 1.0 / CPU_HZ;
@@ -14,7 +14,7 @@ const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
 const SCREEN_SCALE: usize = 10;
 
-const ROM_FILENAME: &str = "roms/brick.ch8";
+const ROM_FILENAME: &str = "roms/rush_hour.ch8";
 
 fn main() {
     let mut emu = Emulator::new();
