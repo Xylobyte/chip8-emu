@@ -1,6 +1,7 @@
 use crate::chip8::Chip8;
+use crate::scheduler::Scheduler;
 use crate::{ROM_FILENAME, SCREEN_HEIGHT, SCREEN_SCALE, SCREEN_WIDTH};
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, KeyRepeat, Window, WindowOptions};
 
 pub struct Emulator {
     window: Window,
@@ -25,12 +26,21 @@ impl Emulator {
         let mut chip8 = Chip8::new();
         chip8.load_rom(ROM_FILENAME);
 
-        while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-            chip8.video_frame_buffer[1] = 1;
-            chip8.video_frame_buffer[2 + SCREEN_WIDTH] = 1;
-            chip8.video_frame_buffer[3] = 1;
-            chip8.video_frame_buffer[5] = 1;
+        let mut scheduler = Scheduler::new();
 
+        while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
+            self.detect_keyboard(&mut chip8);
+
+            scheduler.tick(
+                |chip8, is_timer_step| {
+                    if is_timer_step {
+                        chip8.update_timers();
+                    } else {
+                        chip8.execute_cycle();
+                    }
+                },
+                &mut chip8,
+            );
 
             self.scale_fb(&chip8.video_frame_buffer);
             self.window
@@ -40,6 +50,42 @@ impl Emulator {
                     SCREEN_HEIGHT * SCREEN_SCALE,
                 )
                 .unwrap();
+        }
+    }
+
+    fn detect_keyboard(&self, chip8: &mut Chip8) {
+        for k in self.window.get_keys_pressed(KeyRepeat::No) {
+            if let Some(key) = Self::map_key(&k) {
+                chip8.keypad[key] = 1;
+            }
+        }
+
+        for k in self.window.get_keys_released() {
+            if let Some(key) = Self::map_key(&k) {
+                chip8.keypad[key] = 0;
+            }
+        }
+    }
+
+    fn map_key(key: &Key) -> Option<usize> {
+        match key {
+            Key::X => Some(0),
+            Key::Key1 => Some(1),
+            Key::Key2 => Some(2),
+            Key::Key3 => Some(3),
+            Key::Q => Some(4),
+            Key::W => Some(5),
+            Key::E => Some(6),
+            Key::A => Some(7),
+            Key::S => Some(8),
+            Key::D => Some(9),
+            Key::Z => Some(0xA),
+            Key::C => Some(0xB),
+            Key::Key4 => Some(0xC),
+            Key::R => Some(0xD),
+            Key::F => Some(0xE),
+            Key::V => Some(0xF),
+            _ => None,
         }
     }
 
